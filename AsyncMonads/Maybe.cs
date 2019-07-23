@@ -17,11 +17,9 @@ namespace AsyncMonads
 
         private bool _forExit;
 
-        internal Maybe()
-        {
-        }
+        internal Maybe() { }//Used in async method
 
-        private Maybe(MaybeResult result) => this._result = result;
+        private Maybe(MaybeResult result) => this._result = result;// "Resolved" instance 
 
         public bool IsCompleted { get; private set; }
 
@@ -86,7 +84,7 @@ namespace AsyncMonads
             this._continuation?.Invoke();
         }
 
-        internal void SetChild(IMaybe maybe) => maybe.SetParent(this);
+        
 
         private void NotifyResult(bool isNothing)
         {
@@ -139,19 +137,11 @@ namespace AsyncMonads
                 this.IsNothing = isNothing;
             }
 
-            private T _value;
+            private readonly T _value;
 
-            public bool IsNothing { get; }
+            public readonly bool IsNothing;
 
-            public T GetValue()
-            {
-                if (this.IsNothing)
-                {
-                    throw new Exception("Nothing");
-                }
-
-                return this._value;
-            }
+            public T GetValue() => this.IsNothing ? throw new Exception("Nothing") : this._value;
         }
 
         public struct MaybeResultAwaiter : INotifyCompletion
@@ -191,7 +181,7 @@ namespace AsyncMonads
         {
             if (awaiter is IMaybe maybe)
             {
-                this.Task.SetChild(maybe);
+                maybe.SetParent(this.Task);
             }
 
             awaiter.OnCompleted(stateMachine.MoveNext);
