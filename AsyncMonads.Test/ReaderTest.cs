@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -35,15 +36,34 @@ namespace AsyncMonads.Test
                 new Configuration(100, "¡Felicidades, {0}! Ganaste {1} $", "{0}"),
             };
 
+            var expected = new[]
+            {
+                "Congratulations, John Smith! You won 110$!",
+                "Congratulations, Mary Louie! You won 30$!",
+                "Congratulations, Louis Slaughter! You won 47$!",
+                "¡Felicidades, John! Ganaste 110 $",
+                "¡Felicidades, Mary! Ganaste 30 $",
+                "¡Felicidades, Louis! Ganaste 47 $"
+            };
+
+
+            var actual = new List<string>();
 
             foreach (var configuration in configurations)
             {
-                foreach (var id in ids)
+                foreach (var userId in ids)
                 {
-                    var greeting = await GetGreeting(id).ApplyCfg(configuration);
-                    Console.WriteLine(greeting);
+                    //The logic receives only a single explicit parameter - userId
+                    var logic = GetGreeting(userId);
+
+                    //The rest of parameters (database Id, templates) can be passed implicitly
+                    var greeting = await logic.ApplyCfg(configuration);
+
+                    actual.Add(greeting);
                 }
             }
+
+            CollectionAssert.AreEqual(expected, actual);
         }
 
         private static async Reader<string> GetGreeting(int userId)

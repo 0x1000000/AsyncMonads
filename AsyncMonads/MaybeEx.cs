@@ -13,6 +13,10 @@ namespace AsyncMonads
 
         private Exception _exception;
 
+        private Action _continuation;
+
+        private Action _finalContinuation;
+
         internal MaybeEx() { }
 
         private MaybeEx(MaybeExResult result)
@@ -23,7 +27,22 @@ namespace AsyncMonads
 
         public bool IsCompleted { get; private set; }
 
-        public void OnCompleted(Action continuation) => continuation();
+        public void OnCompleted(Action continuation)
+        {
+            if (this._continuation != null)
+            {
+                throw new Exception("Only one continuation is allowed");
+            }
+
+            if (this._result.HasValue)
+            {
+                continuation();
+            }
+            else
+            {
+                this._continuation = continuation;
+            }
+        }
 
         public MaybeEx<T> GetAwaiter() => this;
 
@@ -41,8 +60,7 @@ namespace AsyncMonads
         internal void SetResult(T result)
         {
             this._result = MaybeExResult.Value(result);
-            this.IsCompleted = true;
-            this._finalContinuation?.Invoke();
+            this.CallContinuation();
         }
 
         internal void SetException(Exception exception)
@@ -55,28 +73,7 @@ namespace AsyncMonads
             {
                 this._exception = exception;
             }
-            this.IsCompleted = true;
-            this._finalContinuation?.Invoke();
-        }
-
-        private MaybeExResult ValidateResult()
-        {
-            if (this._exception != null)
-            {
-                ExceptionDispatchInfo.Throw(this._exception);
-            }
-
-            if (!this.IsCompleted)
-            {
-                throw new Exception("Not Completed");
-            }
-
-            if (!this._result.HasValue)
-            {
-                throw new Exception("No result");
-            }
-
-            return this._result.Value;
+            this.CallContinuation();
         }
 
         public static implicit operator MaybeEx<T>(T value) => Value(value);
@@ -127,6 +124,26 @@ namespace AsyncMonads
             public void OnCompleted(Action continuation) => this._maybe.SetFinalContinuation(continuation);
         }
 
+        private MaybeExResult ValidateResult()
+        {
+            if (this._exception != null)
+            {
+                ExceptionDispatchInfo.Throw(this._exception);
+            }
+
+            if (!this.IsCompleted)
+            {
+                throw new Exception("Not Completed");
+            }
+
+            if (!this._result.HasValue)
+            {
+                throw new Exception("No result");
+            }
+
+            return this._result.Value;
+        }
+
         private void SetFinalContinuation(Action finalContinuation)
         {
             this._finalContinuation = finalContinuation;
@@ -136,7 +153,18 @@ namespace AsyncMonads
             }
         }
 
-        private Action _finalContinuation;
+        private void CallContinuation()
+        {
+            this.IsCompleted = true;
+            if (this._finalContinuation != null)
+            {
+                this._finalContinuation();
+            }
+            else
+            {
+                this._continuation?.Invoke();
+            }
+        }
     }
 
     public class MaybeExTaskMethodBuilder<T>
