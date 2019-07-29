@@ -57,7 +57,7 @@ namespace AsyncMonads.Test
                     var logic = GetGreeting(userId);
 
                     //The rest of parameters (database Id, templates) can be passed implicitly
-                    var greeting = await logic.ApplyCfg(configuration);
+                    var greeting = await logic.Apply(configuration);
 
                     actual.Add(greeting);
                 }

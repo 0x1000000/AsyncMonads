@@ -7,17 +7,19 @@ namespace AsyncMonads
     [AsyncMethodBuilder(typeof(ReaderTaskMethodBuilder<>))]
     public class Reader<T> : INotifyCompletion, IReader
     {
-        private Reader(Func<object, T> exec) => this._body = exec;
-
+        //Used by ReaderTaskMethodBuilder in a compiler generated code
         internal Reader() { }
 
-        public static Reader<T> Read<TCfg>(Func<TCfg, T> exec) => new Reader<T>(cfg => exec((TCfg)cfg));
+        //Used to extract some value from a context
+        public static Reader<T> Read<TCfg>(Func<TCfg, T> extractor) => new Reader<T>(cfg => extractor((TCfg)cfg));
+
+        private Reader(Func<object, T> exec) => this._extractor = exec;
 
         public bool IsCompleted { get; private set; }
 
-        private readonly Func<object, T> _body;
+        private readonly Func<object, T> _extractor;
 
-        private object _cfg;
+        private object _ctx;
 
         private Action _continuation;
 
@@ -29,9 +31,13 @@ namespace AsyncMonads
 
         public Reader<T> GetAwaiter() => this;
 
-        public Reader<T> ApplyCfg(object cfg)
+        public Reader<T> Apply(object ctx)
         {
-            this.SetCfg(cfg);
+            if (this._ctx != null)
+            {
+                throw new Exception("Another context is already applied to the reader");
+            }
+            this.SetCtx(ctx);
             return this;
         }
 
@@ -83,27 +89,22 @@ namespace AsyncMonads
         internal void SetChild(IReader reader)
         {
             this._child = reader;
-            if (this._cfg != null)
+            if (this._ctx != null)
             {
-                this._child.SetCfg(this._cfg);
+                this._child.SetCtx(this._ctx);
             }
         }
 
-        public void SetCfg(object cfg)
+        public void SetCtx(object ctx)
         {
-            this._cfg = cfg;
-            this.ProcessChild();
-        }
-
-        private void ProcessChild()
-        {
-            if (this._cfg != null)
+            this._ctx = ctx;
+            if (this._ctx != null)
             {
-                this._child?.SetCfg(this._cfg);
+                this._child?.SetCtx(this._ctx);
 
-                if (this._body != null)
+                if (this._extractor != null)
                 {
-                    this.SetResult(this._body(this._cfg));
+                    this.SetResult(this._extractor(this._ctx));
                 }
             }
         }
@@ -111,31 +112,18 @@ namespace AsyncMonads
 
     public class ReaderTaskMethodBuilder<T>
     {
-        public ReaderTaskMethodBuilder()
-        {
-            this.Task = new Reader<T>();
-        }
+        public ReaderTaskMethodBuilder() => this.Task = new Reader<T>();
 
         public static ReaderTaskMethodBuilder<T> Create() => new ReaderTaskMethodBuilder<T>();
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine
-        {
-            stateMachine.MoveNext();
-        }
+            => stateMachine.MoveNext();
 
-        public void SetStateMachine(IAsyncStateMachine stateMachine)
-        {
-        }
+        public void SetStateMachine(IAsyncStateMachine stateMachine) { }
 
-        public void SetException(Exception exception)
-        {
-            this.Task.SetException(exception);
-        }
+        public void SetException(Exception exception) => this.Task.SetException(exception);
 
-        public void SetResult(T result)
-        {
-            this.Task.SetResult(result);
-        }
+        public void SetResult(T result) => this.Task.SetResult(result);
 
         public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
             where TAwaiter : INotifyCompletion
@@ -168,6 +156,6 @@ namespace AsyncMonads
 
     public interface IReader
     {
-        void SetCfg(object cfg);
+        void SetCtx(object ctx);
     }
 }
