@@ -4,6 +4,13 @@ using System.Runtime.ExceptionServices;
 
 namespace AsyncMonads
 {
+    public static class Reader
+    {
+        //Used to extract some value from a context
+        public static Reader<TService> GetService<TService>() => 
+            Reader<TService>.Read<IServiceProvider>(serviceProvider => (TService)serviceProvider.GetService(typeof(TService)));
+    }
+
     [AsyncMethodBuilder(typeof(ReaderTaskMethodBuilder<>))]
     public class Reader<T> : INotifyCompletion, IReader
     {
@@ -11,7 +18,7 @@ namespace AsyncMonads
         internal Reader() { }
 
         //Used to extract some value from a context
-        public static Reader<T> Read<TCfg>(Func<TCfg, T> extractor) => new Reader<T>(cfg => extractor((TCfg)cfg));
+        public static Reader<T> Read<TCtx>(Func<TCtx, T> extractor) => new Reader<T>(ctx => Extract(ctx, extractor));
 
         private Reader(Func<object, T> exec) => this._extractor = exec;
 
@@ -108,6 +115,20 @@ namespace AsyncMonads
                 }
             }
         }
+
+        private static T Extract<TCtx>(object ctx, Func<TCtx, T> extractor)
+        {
+            if (extractor == null)
+            {
+                throw new Exception("Some extracting function should be defined");
+            }
+            if (ctx is TCtx tCtx)
+            {
+                return extractor(tCtx);
+            }
+
+            throw new Exception($"Could not cast the passed context to type '{typeof(TCtx).Name}'");
+        }
     }
 
     public class ReaderTaskMethodBuilder<T>
@@ -154,7 +175,7 @@ namespace AsyncMonads
         public Reader<T> Task { get; }
     }
 
-    public interface IReader
+    internal interface IReader
     {
         void SetCtx(object ctx);
     }

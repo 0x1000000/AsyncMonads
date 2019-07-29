@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace AsyncMonads.Test
 {
     [TestFixture]
-    public class ReaderTest
+    public static class ReaderTest
     {
         public class Configuration
         {
@@ -26,7 +26,7 @@ namespace AsyncMonads.Test
         }
 
         [Test]
-        public async Task Main()
+        public static async Task Main()
         {
             int[] ids = { 1, 2, 3 };
 
@@ -78,7 +78,6 @@ namespace AsyncMonads.Test
 
         }
 
-
         private static async Reader<string> GetFullName(int userId)
         {
             var template = await Reader<string>.Read<Configuration>(cfg => cfg.NameFormat);
@@ -106,7 +105,6 @@ namespace AsyncMonads.Test
             var dataBase = await GetDataBase();
             return await dataBase.GetWin(userId);
         }
-
 
         private static async Reader<Database> GetDataBase()
         {
